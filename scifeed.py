@@ -1,44 +1,41 @@
 import streamlit as st
-import arxiv
-import time
+import feedparser
+from datetime import datetime
 
 st.set_page_config(page_title="SciFeed", page_icon="🔬", layout="centered")
 
 st.title("🔬 SciFeed")
-st.subheader("Résumés ultra-simples")
+st.subheader("Veille scientifique simple")
 
 domaines = {
-    "Physique Quantique": "quant-ph",
-    "Biologie & Neurosciences": "neuroscience OR brain",
-    "Informatique & IA": "machine learning OR artificial intelligence",
-    "Hardware & Technologie": "nanotechnology OR semiconductor",
-    "Spiritualité & Science": "consciousness"
+    "Physique Quantique": "https://arxiv.org/rss/quant-ph",
+    "Biologie & Neurosciences": "https://arxiv.org/rss/q-bio",
+    "Informatique & IA": "https://arxiv.org/rss/cs",
+    "Hardware & Technologie": "https://arxiv.org/rss/physics",
+    "Spiritualité & Science": "https://arxiv.org/rss/physics"  # à ajuster
 }
 
 domaine = st.selectbox("Choisis ton domaine :", list(domaines.keys()))
 
-if st.button("🔄 Charger les dernières études", type="primary"):
-    with st.spinner("Connexion à arXiv (peut prendre 10-15 secondes)..."):
-        time.sleep(2)   # Délai important
+if st.button("🔄 Charger les dernières études"):
+    with st.spinner("Chargement via RSS..."):
         try:
-            search = arxiv.Search(
-                query=domaines[domaine],
-                max_results=5,
-                sort_by=arxiv.SortCriterion.SubmittedDate,
-                sort_order=arxiv.SortOrder.Descending
-            )
-            papers = list(search.results())
+            feed = feedparser.parse(domaines[domaine])
+            entries = feed.entries[:6]
             
-            if papers:
-                st.success(f"{len(papers)} articles trouvés")
-                for paper in papers:
-                    with st.expander(f"📝 {paper.title[:110]}..."):
-                        st.caption(f"**Date :** {paper.published.strftime('%d %B %Y')}")
-                        summary = paper.summary[:520] + "..." if len(paper.summary) > 520 else paper.summary
-                        st.write(summary)
-                        st.link_button("📄 PDF", paper.pdf_url)
-                        st.link_button("🌐 arXiv", paper.entry_id)
-            else:
+            if not entries:
                 st.warning("Aucun article trouvé.")
+            else:
+                st.success(f"{len(entries)} articles récents")
+                for entry in entries:
+                    with st.expander(entry.title[:120] + "..." if len(entry.title) > 120 else entry.title):
+                        st.caption(f"Publié le : {entry.published[:16] if 'published' in entry else 'Date inconnue'}")
+                        summary = entry.summary[:500] + "..." if 'summary' in entry and len(entry.summary) > 500 else entry.get('summary', 'Pas de résumé disponible.')
+                        st.write(summary)
+                        if 'link' in entry:
+                            st.link_button("Lire sur arXiv", entry.link)
         except:
-            st.error("arXiv est lent. Attends 30 secondes et réessaie.")
+            st.error("Impossible de charger pour le moment. Réessaie dans 1 minute.")
+
+st.divider()
+st.caption("SciFeed • Utilise les flux RSS d'arXiv")
